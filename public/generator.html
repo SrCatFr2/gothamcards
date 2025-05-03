@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gotham Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="generator.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                             <span class="logo-text">Gotham</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-item">
+                    <i class="fa-solid fa-credit-card"></i>
+                    <span>Checker</span>
+                </a>
+                <a href="#" class="nav-item active">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Generator</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Stats</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <div class="user-section">
+                <a href="#" class="nav-item">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Telegram</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="page-title">
+                    <h1>CC Generator</h1>
+                    <div class="security-badge secure">
+                        <i class="fa-solid fa-shield-check"></i>
+                        <span>Secure Connection</span>
+                    </div>
+                </div>
+                
+                <div class="actions">
+                    <button class="icon-button">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <button class="icon-button">
+                        <i class="fa-solid fa-bell"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Generator Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Generate Cards</h2>
+                        <p class="subtitle">Enter a BIN to generate valid credit card numbers</p>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="generator-form">
+                            <!-- BIN Input -->
+                            <div class="form-group">
+                                <label>BIN</label>
+                                <div class="input-wrapper">
+                                    <input type="text" id="bin-input" placeholder="Enter BIN (e.g. 451234)">
+                                    <button class="clear-btn">×</button>
+                                </div>
+                                <span class="hint-text">Enter at least 6 digits</span>
+                            </div>
+
+                            <!-- Checkboxes -->
+                            <div class="checkbox-row">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="date-check" checked>
+                                    <label for="date-check">Include Date</label>
+                                </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="cvv-check" checked>
+                                    <label for="cvv-check">Include CVV</label>
+                                </div>
+                            </div>
+
+                            <!-- Quantity -->
+                            <div class="form-group">
+                                <label>Quantity</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="quantity" value="10" min="1" max="100">
+                                    <span class="hint-text">Max 100 cards</span>
+                                </div>
+                            </div>
+
+                            <!-- CVV Type -->
+                            <div class="form-group">
+                                <label>CVV Type</label>
+                                <select id="cvv-type">
+                                    <option value="random">Random</option>
+                                    <option value="same">Same CVV</option>
+                                </select>
+                            </div>
+
+                            <!-- Month -->
+                            <div class="form-group">
+                                <label>Month</label>
+                                <select id="month">
+                                    <option value="random">Random</option>
+                                    <option value="01">01</option>
+                                    <option value="02">02</option>
+                                    <option value="03">03</option>
+                                    <option value="04">04</option>
+                                    <option value="05">05</option>
+                                    <option value="06">06</option>
+                                    <option value="07">07</option>
+                                    <option value="08">08</option>
+                                    <option value="09">09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                </select>
+                            </div>
+
+                            <!-- Year -->
+                            <div class="form-group">
+                                <label>Year</label>
+                                <select id="year">
+                                    <option value="random">Random</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                    <option value="2029">2029</option>
+                                    <option value="2030">2030</option>
+                                </select>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="button-group">
+                                <button id="generate-btn" class="btn-primary">
+                                    <i class="fa-solid fa-bolt"></i>
+                                    Generate
+                                </button>
+                                <button id="clear-btn" class="btn-secondary">
+                                    <i class="fa-solid fa-trash"></i>
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Card -->
+                <div class="card">
+                    <div class="card-header with-actions">
+                        <div class="header-title">
+                            <i class="fa-solid fa-credit-card"></i>
+                            Generated Cards
+                        </div>
+                        <div class="header-actions">
+                            <button class="icon-btn" id="copy-btn" disabled>
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                            <button class="icon-btn" id="download-btn" disabled>
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div id="empty-state" class="empty-state">
+                            <i class="fa-solid fa-credit-card"></i>
+                            <p>Generated cards will appear here</p>
+                        </div>
+                        <textarea id="results" class="hidden"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden">
+        <i class="fa-solid fa-check"></i>
+        <span></span>
+    </div>
+
+    <script src="generator.js"></script>
+</body>
+</html>

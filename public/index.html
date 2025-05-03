@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gotham Checker</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="description" content="Credit card validation system">
+    <meta name="theme-color" content="#121212">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">
+                
+                <span class="logo-text">Gotham</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active">
+                    <i class="fa-solid fa-credit-card"></i>
+                    <span>Checker</span>
+                </a>
+                <a href="/generator.html" class="nav-item">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Generator</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Stats</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <div class="user-section">
+                <a href="#" class="nav-item">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Telegram</span>
+                </a>
+                <div class="user-profile">
+                    <img src="https://i.imgur.com/uIgDDDd.png" alt="User" class="user-avatar">
+                    <div class="user-info">
+                        <div class="username">Bruno Alexis</div>
+                        <div class="user-status">Free</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="page-title">
+                    <h1>CC Checker</h1>
+                    <div class="security-badge secure" id="security-badge">
+                        <i class="fa-solid fa-shield-check"></i>
+                        <span>Secure Connection</span>
+                    </div>
+                </div>
+                
+                <div class="actions">
+                    <button class="icon-button" id="theme-toggle">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <button class="icon-button">
+                        <i class="fa-solid fa-bell"></i>
+                    </button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="card checker-card">
+                    <div class="card-header">
+                        <h2>Check Cards</h2>
+                        <span class="card-subtitle">Enter cards in the format: XXXX XXXX XXXX XXXX|MM|YY|CVC</span>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="input-area">
+                            <textarea id="card-list" placeholder="Enter your cards here (max 20)"></textarea>
+                            <div class="input-footer">
+                                <span class="counter">0/20 cards</span>
+                                <button class="text-button" id="clear-button">Clear</button>
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="primary-button" id="start-button">
+                                <i class="fa-solid fa-play"></i>
+                                Start Checking
+                            </button>
+                            <button class="secondary-button" id="stop-button" disabled>
+                                <i class="fa-solid fa-stop"></i>
+                                Stop
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card results-card">
+                    <div class="card-header with-tabs">
+                        <div class="tabs" id="result-tabs">
+                            <button class="tab active" data-tab="lives">
+                                <i class="fa-solid fa-check-circle"></i>
+                                Lives
+                                <span class="badge" id="lives-counter">0</span>
+                            </button>
+                            <button class="tab" data-tab="dead">
+                                <i class="fa-solid fa-times-circle"></i>
+                                Dead
+                                <span class="badge" id="dead-counter">0</span>
+                            </button>
+                            <button class="tab" data-tab="error">
+                                <i class="fa-solid fa-exclamation-triangle"></i>
+                                Error
+                                <span class="badge" id="error-counter">0</span>
+                            </button>
+                        </div>
+                        <div class="card-actions">
+                            <button class="icon-button" id="copy-all-button">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                            <button class="icon-button" id="download-button">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="loader hidden" id="checking-loader">
+                            <div class="spinner"></div>
+                            <p>Checking cards...</p>
+                            <span class="progress-text" id="progress-text">0/0</span>
+                        </div>
+                        
+                        <div class="tab-content">
+                            <div class="tab-pane active" id="lives-content">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-check-circle"></i>
+                                    <p>No approved cards yet</p>
+                                </div>
+                            </div>
+                            <div class="tab-pane" id="dead-content">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-times-circle"></i>
+                                    <p>No declined cards yet</p>
+                                </div>
+                            </div>
+                            <div class="tab-pane" id="error-content">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-exclamation-triangle"></i>
+                                    <p>No error cards yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="app-footer">
+                <div class="footer-info">
+                    <p>Gotham Checker v2.0</p>
+                    <p>© 2025 Gotham Labs - Aeolous Enterprise</p>
+                </div>
+                <div class="supported-cards">
+                    <i class="fa-brands fa-cc-visa"></i>
+                    <i class="fa-brands fa-cc-mastercard"></i>
+                    <i class="fa-brands fa-cc-amex"></i>
+                    <i class="fa-brands fa-cc-discover"></i>
+                </div>
+            </footer>
+        </div>
+    </div>
+    
+    <div class="toast hidden" id="toast">
+        <i class="fa-solid fa-check"></i>
+        <span id="toast-message">Operation successful</span>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
