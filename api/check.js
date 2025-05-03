@@ -192,7 +192,7 @@ async function checkRecurly(cardNumber, month, year, cvv) {
             message = "Approved #CCN! 🟩";
         } else {
             status = "declined";
-            message = "Your card was declined. 🔴";
+            message = "Declined. 🔴";
         }
         
         // Preparar resultado
