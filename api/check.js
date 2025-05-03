@@ -1,34 +1,5 @@
 const axios = require('axios');
 
-// Tokens válidos (en memoria)
-const validTokens = new Map();
-
-// Middleware para obtener la IP del cliente
-function getClientId(req) {
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const userAgent = req.headers['user-agent'] || 'unknown';
-  return `${ip}-${userAgent.substring(0, 20)}`;
-}
-
-// Verificar token
-function verifyToken(token, clientId) {
-  const tokenData = validTokens.get(token);
-  return tokenData && tokenData.clientId === clientId && tokenData.expiresAt > Date.now();
-}
-
-// Generar nuevo token
-function generateToken(clientId) {
-  const token = Math.random().toString(36).substring(2, 15) + 
-              Math.random().toString(36).substring(2, 15);
-  
-  validTokens.set(token, {
-    clientId: clientId,
-    expiresAt: Date.now() + 30000 // 30 segundos
-  });
-  
-  return token;
-}
-
 // Función para generar email aleatorio
 function generateRandomEmail() {
   const names = ['john', 'jane', 'mike', 'sara', 'alex', 'emma', 'james', 'lisa'];
@@ -215,6 +186,12 @@ async function checkCard(cardNumber, month, year, cvc) {
   }
 }
 
+// Generar un nuevo token
+function generateNewToken() {
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
+}
+
 // Manejador principal
 module.exports = async (req, res) => {
   // Habilitar CORS
@@ -233,27 +210,15 @@ module.exports = async (req, res) => {
   }
   
   try {
-    // Verificar token
+    // Verificar que hay un header de autorización (no validamos el token específico)
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    const clientId = getClientId(req);
     
-    if (!token) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required'
       });
     }
-    
-    if (!verifyToken(token, clientId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-    
-    // Generar nuevo token
-    const newToken = generateToken(clientId);
     
     // Verificar datos de la tarjeta
     const { cardNumber, month, year, cvc } = req.body;
@@ -268,7 +233,8 @@ module.exports = async (req, res) => {
     // Verificar tarjeta
     const result = await checkCard(cardNumber, month, year, cvc);
     
-    // Incluir nuevo token en respuesta
+    // Generar nuevo token para la siguiente solicitud
+    const newToken = generateNewToken();
     result.token = newToken;
     
     return res.status(200).json(result);
